@@ -31,7 +31,7 @@ func PatternMatch(m Message) (errMsg string, ok bool) {
 // The regex pattern is highly inspired by convention of Angular and the Conventional Commits
 // FYI, the types of commits in regex sorted in alphabetical order for better readability
 func getPattern() string {
-	const pattern = `^(BREAKING CHANGE|build|chore|ci|deps|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9 \-]+\))?!?: [\w \-]+$`
+	const pattern = `^(BREAKING CHANGE|build|chore|ci|deps|docs|feat|fix|perf|refactor|revert|style|test)(\([a-zA-Z0-9 _\-]+\))?!?: [\w \-.,!':/@()]+$`
 
 	return pattern
 }

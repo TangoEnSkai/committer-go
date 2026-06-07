@@ -4,7 +4,7 @@ export PATH := $(GOBIN):$(PATH)
 
 .PHONY: commit-checker
 commit-checker:
-	@go build -o ./tools/commit-msg ./cmd/main.go
+	@go build -o ./tools/commit-msg ./cmd/committer/main.go
 	@rm -f .git/hooks/commit-msg
 	@ln -s ../../tools/commit-msg .git/hooks/commit-msg
 	@printf "commit-checker has been built and installed to .git/hooks/commit-msg\n"

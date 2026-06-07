@@ -8,7 +8,7 @@ import (
 )
 
 func TestPatternMatch(t *testing.T) {
-	const pattern = `^(BREAKING CHANGE|build|chore|ci|deps|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9 \-]+\))?!?: [\w \-]+$`
+	const pattern = `^(BREAKING CHANGE|build|chore|ci|deps|docs|feat|fix|perf|refactor|revert|style|test)(\([a-zA-Z0-9 _\-]+\))?!?: [\w \-.,!':/@()]+$`
 
 	errorMessage := fmt.Sprintf("invalid commit message. \n\tmust follow this rule: %v\n\t\t", pattern)
 
@@ -22,10 +22,15 @@ func TestPatternMatch(t *testing.T) {
 		{"success/simple", "perf: optimise pattern matching", "", true},
 		{"success/with scope", "feat(api): add new endpoint", "", true},
 		{"success/with numeric scope", "fix(v2): correct parser", "", true},
+		{"success/uppercase scope", "feat(MyApp): add login", "", true},
+		{"success/underscore scope", "fix(my_module): fix bug", "", true},
 		{"success/breaking change bang", "feat!: remove deprecated API", "", true},
 		{"success/scope and breaking", "feat(auth)!: require 2FA", "", true},
 		{"success/revert", "revert: undo login change", "", true},
 		{"success/deps", "deps: upgrade go-chi", "", true},
+		{"success/apostrophe in subject", "fix: don't crash on nil", "", true},
+		{"success/dot in subject", "docs: update README.md", "", true},
+		{"success/slash in subject", "fix: update src/main.go", "", true},
 		// invalid
 		{"failed/unknown type", "performance: is not valid type", errorMessage, false},
 		{"failed/missing colon space", "feat add feature", errorMessage, false},

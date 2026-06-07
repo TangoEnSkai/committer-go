@@ -35,9 +35,15 @@ func TestCheckLength(t *testing.T) {
 		},
 		{
 			name:       "success/exactly maxLength",
-			args:       "feat: this commit is exactly sixty characters long okkkkk", // 57 chars — within limit
+			args:       "feat: exactly sixty chars: padding here xxxxxxxxxxxxxxxxxxxx", // 60 chars
 			wantErrStr: "",
 			wantOk:     true,
+		},
+		{
+			name:       "failed/one above maxLength",
+			args:       "feat: exactly sixty chars: padding here xxxxxxxxxxxxxxxxxxxxx", // 61 chars
+			wantErrStr: fmt.Sprintf("\tthe commit `%s` is too long: got(%d), need <= (%d)", "feat: exactly sixty chars: padding here xxxxxxxxxxxxxxxxxxxxx", 61, maxLength),
+			wantOk:     false,
 		},
 		{
 			name:       "failed/too short",

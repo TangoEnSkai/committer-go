@@ -70,6 +70,8 @@ feat: too short               # under 10 chars
 
 ```bash
 go install github.com/TangoEnSkai/committer-go/cmd/committer@latest
+
+> The binary will be installed as `committer` in `$GOPATH/bin` (or `$HOME/go/bin`).
 ```
 
 ### from source
