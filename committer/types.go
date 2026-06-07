@@ -18,11 +18,13 @@ const (
 	build                            // change that build system or external dependencies
 	chore                            // something else
 	ci                               // change to our CI configuration files and scripts
+	deps                             // dependency updates
 	docs                             // documentation only changes
 	feat                             // a new feature
 	fix                              // a bug fix
 	perf                             // a code change that improves performance
 	refactor                         // a code change that neither fixes a bug nor add a feature
+	revert                           // reverts a previous commit
 	style                            // changes that do not affect the meaning of the code (e.g. whitespace)
 	test                             // adding missing tests or correcting existing tests
 )
@@ -39,6 +41,8 @@ func (t commitType) String() string {
 		return "chore"
 	case ci:
 		return "ci"
+	case deps:
+		return "deps"
 	case docs:
 		return "docs"
 	case feat:
@@ -49,6 +53,8 @@ func (t commitType) String() string {
 		return "perf"
 	case refactor:
 		return "refactor"
+	case revert:
+		return "revert"
 	case style:
 		return "style"
 	case test:
@@ -66,7 +72,7 @@ func CheckCommitType(m Message) (errMsg string, ok bool) {
 		c := m[i]
 
 		// this is attempt to get the type before actual scope or commit message
-		if c == ':' || c == '(' {
+		if c == ':' || c == '(' || c == '!' {
 			break
 		}
 
@@ -81,11 +87,13 @@ func CheckCommitType(m Message) (errMsg string, ok bool) {
 	case build.String():
 	case chore.String():
 	case ci.String():
+	case deps.String():
 	case docs.String():
 	case feat.String():
 	case fix.String():
 	case perf.String():
 	case refactor.String():
+	case revert.String():
 	case style.String():
 	case test.String():
 	default:
@@ -104,7 +112,7 @@ func CheckCommitType(m Message) (errMsg string, ok bool) {
 // this is only used for letting user know when they failed to commit
 // because of type mismatch issue
 func printTypes() string {
-	const types = `(BREAKING CHANGE | build | chore | ci | docs | feat | fix | perf | refactor | style | test)`
+	const types = `(BREAKING CHANGE | build | chore | ci | deps | docs | feat | fix | perf | refactor | revert | style | test)`
 
 	return types
 }

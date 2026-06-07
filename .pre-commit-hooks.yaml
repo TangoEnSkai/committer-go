@@ -1,0 +1,8 @@
+- id: committer-go
+  name: Conventional Commit Lint
+  description: Validates commit messages against the Conventional Commits specification
+  language: golang
+  entry: committer
+  args: []
+  stages: [commit-msg]
+  pass_filenames: false
