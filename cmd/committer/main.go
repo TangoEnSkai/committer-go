@@ -22,7 +22,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	header := committer.NewFirstLine(commitMsg)
+	header, err := committer.NewFirstLine(commitMsg)
+	if err != nil {
+		committer.Print(commitMsg, err.Error())
+		os.Exit(1)
+	}
 
 	// 1. check the commit message is shorter than maximum length
 	errMsg, ok := committer.CheckLength(header)

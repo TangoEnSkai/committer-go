@@ -29,10 +29,9 @@ func PatternMatch(m Message) (errMsg string, ok bool) {
 
 // getPattern return a regular expression of conventional commit message
 // The regex pattern is highly inspired by convention of Angular and the Conventional Commits
-// however, it could be customized by `@ms-home` in the future, depending on the team's situation
 // FYI, the types of commits in regex sorted in alphabetical order for better readability
 func getPattern() string {
-	const pattern = `^(BREAKING CHANGE|build|chore|ci|docs|feat|fix|perf|refactor|style|test)(\([a-z \-]+\))?: [\w \-]+$`
+	const pattern = `^(BREAKING CHANGE|build|chore|ci|deps|docs|feat|fix|perf|refactor|revert|style|test)(\([a-zA-Z0-9 _\-]+\))?!?: [\w \-.,!':/@()]+$`
 
 	return pattern
 }
