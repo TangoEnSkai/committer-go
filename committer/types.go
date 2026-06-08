@@ -3,6 +3,8 @@ package committer
 import (
 	"fmt"
 	"strings"
+
+	"github.com/xrash/smetrics"
 )
 
 // Message represents a raw git commit message.
@@ -69,12 +71,41 @@ func CheckCommitTypeWithConfig(m Message, cfg Config) (errMsg string, ok bool) {
 	}
 
 	allTypes := append(validTypes, cfg.Types.Extra...)
+
+	// Find closest type suggestion using Jaro-Winkler similarity.
+	suggestion := findTypeSuggestion(t, allTypes)
+
 	errMsg = fmt.Sprintf(
 		"%v has invalid commit type\n\tavailable commit types are:\n\t(%v)",
 		m, strings.Join(allTypes, " | "),
 	)
+	if suggestion != "" {
+		errMsg = fmt.Sprintf(
+			"%v has invalid commit type\n  Did you mean: %s?\n\n  Available types: (%v)",
+			m, suggestion, strings.Join(allTypes, " | "),
+		)
+	}
 
 	return errMsg, false
+}
+
+// findTypeSuggestion returns the best matching type if Jaro-Winkler score >= 0.85,
+// or empty string if no close match is found.
+func findTypeSuggestion(input string, types []string) string {
+	const threshold = 0.85
+	bestScore := 0.0
+	bestType := ""
+	for _, t := range types {
+		score := smetrics.JaroWinkler(input, t, 0.1, 4)
+		if score > bestScore {
+			bestScore = score
+			bestType = t
+		}
+	}
+	if bestScore >= threshold {
+		return bestType
+	}
+	return ""
 }
 
 // printTypes returns a formatted list of valid commit types for display in errors.
