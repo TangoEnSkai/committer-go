@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/TangoEnSkai/committer-go/committer"
 	"github.com/urfave/cli/v2"
@@ -64,6 +66,21 @@ func main() {
 				Usage: "Create .committer.yaml config, install git hook, and create .githooks/commit-msg",
 				Action: func(c *cli.Context) error {
 					return runInit()
+				},
+			},
+			{
+				Name:  "check",
+				Usage: "Validate recent commit messages in the current git repository",
+				Flags: []cli.Flag{
+					&cli.IntFlag{
+						Name:  "count",
+						Value: 10,
+						Usage: "Number of recent commits to validate",
+					},
+					formatFlag,
+				},
+				Action: func(c *cli.Context) error {
+					return runCheck(c.Int("count"), cfg, c.String("format"))
 				},
 			},
 		},
@@ -175,6 +192,80 @@ func runInit() error {
 	fmt.Println()
 	fmt.Println("To share the hook with your team, commit .githooks/ and ask teammates to run:")
 	fmt.Println("  git config core.hooksPath .githooks")
+	return nil
+}
+
+// checkResult holds one commit's validation result for batch mode.
+type checkResult struct {
+	Subject string `json:"subject"`
+	Valid   bool   `json:"valid"`
+	Error   string `json:"error,omitempty"`
+}
+
+// checkSummary is the JSON output of runCheck.
+type checkSummary struct {
+	Total   int           `json:"total"`
+	Passed  int           `json:"passed"`
+	Failed  int           `json:"failed"`
+	Results []checkResult `json:"results"`
+}
+
+// runCheck validates the last count commits in the current git repo.
+func runCheck(count int, cfg committer.Config, format string) error {
+	out, err := exec.Command("git", "log", fmt.Sprintf("-%d", count), "--format=%s").Output()
+	if err != nil {
+		return cli.Exit(fmt.Sprintf("git log failed: %v", err), 1)
+	}
+
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	if len(lines) == 1 && lines[0] == "" {
+		lines = nil
+	}
+
+	var results []checkResult
+	passed, failed := 0, 0
+	for _, subject := range lines {
+		msg := committer.Message(subject)
+		errMsg, ok := committer.ValidateMessage(msg, cfg)
+		r := checkResult{Subject: subject, Valid: ok}
+		if !ok {
+			r.Error = errMsg
+			failed++
+		} else {
+			passed++
+		}
+		results = append(results, r)
+	}
+
+	if format == "json" {
+		summary := checkSummary{
+			Total:   len(results),
+			Passed:  passed,
+			Failed:  failed,
+			Results: results,
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(summary); err != nil {
+			return cli.Exit(fmt.Sprintf("json encode error: %v", err), 1)
+		}
+		if failed > 0 {
+			return cli.Exit("", 1)
+		}
+		return nil
+	}
+
+	// text mode
+	fmt.Printf("Checked %d commits: %d passed, %d failed\n", len(results), passed, failed)
+	if failed > 0 {
+		fmt.Println("\nFailed commits:")
+		for _, r := range results {
+			if !r.Valid {
+				fmt.Printf("  ✗ %s\n    %s\n", r.Subject, r.Error)
+			}
+		}
+		return cli.Exit("", 1)
+	}
 	return nil
 }
 
