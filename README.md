@@ -131,6 +131,31 @@ make commit-checker
 
 ---
 
+## Playground (WASM)
+
+A browser-based playground lets you validate commit messages without installing anything.
+
+### Build locally
+
+```bash
+cd playground
+make build
+# Artifacts are written to playground/static/ (gitignored)
+```
+
+### Run locally
+
+Serve the `playground/static/` directory with any static file server that sets the correct MIME type for `.wasm` files:
+
+```bash
+# Go 1.21+
+cd playground/static
+python3 -m http.server 8080
+# open http://localhost:8080
+```
+
+---
+
 ## License
 
 [MIT](./LICENSE)

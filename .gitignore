@@ -13,3 +13,6 @@
 
 # ingore binaries under tools
 tools/*
+
+# WASM playground built artifacts
+playground/static/
