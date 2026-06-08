@@ -111,6 +111,73 @@ func TestCheckLengthWithConfig(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_Extends_LocalFile(t *testing.T) {
+	tmp := t.TempDir()
+
+	// Write the base config.
+	baseContent := []byte("length:\n  min: 5\n  max: 80\ntypes:\n  extra:\n    - hotfix\n")
+	basePath := filepath.Join(tmp, "base.committer.yaml")
+	if err := os.WriteFile(basePath, baseContent, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write the local config that extends base.
+	localContent := []byte("extends: " + basePath + "\nlength:\n  max: 100\ntypes:\n  extra:\n    - wip\n")
+	if err := os.WriteFile(filepath.Join(tmp, ".committer.yaml"), localContent, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	orig, _ := os.Getwd()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(orig) }()
+
+	cfg, err := committer.LoadConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Local overrides base for max.
+	if cfg.Length.Max != 100 {
+		t.Errorf("Length.Max: got %d, want 100", cfg.Length.Max)
+	}
+	// Base value for min is inherited.
+	if cfg.Length.Min != 5 {
+		t.Errorf("Length.Min: got %d, want 5", cfg.Length.Min)
+	}
+	// Extra types from both base and local are present.
+	found := map[string]bool{}
+	for _, e := range cfg.Types.Extra {
+		found[e] = true
+	}
+	if !found["hotfix"] {
+		t.Error("expected base extra type 'hotfix' in merged config")
+	}
+	if !found["wip"] {
+		t.Error("expected local extra type 'wip' in merged config")
+	}
+}
+
+func TestLoadConfig_Extends_NotFound(t *testing.T) {
+	tmp := t.TempDir()
+	localContent := []byte("extends: /nonexistent/path/.committer.yaml\n")
+	if err := os.WriteFile(filepath.Join(tmp, ".committer.yaml"), localContent, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	orig, _ := os.Getwd()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(orig) }()
+
+	_, err := committer.LoadConfig()
+	if err == nil {
+		t.Error("expected error when extends file not found, got nil")
+	}
+}
+
 func TestCheckCommitTypeWithConfig_ExtraTypes(t *testing.T) {
 	cfg := committer.Config{
 		Length: committer.LengthConfig{Min: 10, Max: 60},
