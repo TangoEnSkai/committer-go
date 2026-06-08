@@ -59,6 +59,13 @@ func main() {
 					return runInstall()
 				},
 			},
+			{
+				Name:  "init",
+				Usage: "Create .committer.yaml config, install git hook, and create .githooks/commit-msg",
+				Action: func(c *cli.Context) error {
+					return runInit()
+				},
+			},
 		},
 	}
 
@@ -120,6 +127,54 @@ func runInstall() error {
 	}
 
 	fmt.Printf("installed commit-msg hook at %s\n", hookPath)
+	return nil
+}
+
+const committerYAMLTemplate = `# committer-go configuration
+# https://github.com/TangoEnSkai/committer-go
+
+length:
+  min: 10   # minimum header length in characters
+  max: 60   # maximum header length in characters
+
+types:
+  extra: [] # add project-specific types here, e.g. [wip, release]
+`
+
+const githookContent = `#!/bin/sh
+committer "$1"
+`
+
+// runInit creates .committer.yaml, installs the git hook, and creates .githooks/commit-msg.
+func runInit() error {
+	// 1. Create .committer.yaml
+	const configFile = ".committer.yaml"
+	if _, err := os.Stat(configFile); err == nil {
+		fmt.Printf("%s already exists, skipping\n", configFile)
+	} else {
+		if err := os.WriteFile(configFile, []byte(committerYAMLTemplate), 0o644); err != nil {
+			return cli.Exit(fmt.Sprintf("could not write %s: %v", configFile, err), 1)
+		}
+		fmt.Printf("created %s\n", configFile)
+	}
+
+	// 2. Install git hook
+	if err := runInstall(); err != nil {
+		return err
+	}
+
+	// 3. Create .githooks/commit-msg for team sharing
+	if err := os.MkdirAll(".githooks", 0o755); err != nil {
+		return cli.Exit(fmt.Sprintf("could not create .githooks directory: %v", err), 1)
+	}
+	githookPath := filepath.Join(".githooks", "commit-msg")
+	if err := os.WriteFile(githookPath, []byte(githookContent), 0o755); err != nil {
+		return cli.Exit(fmt.Sprintf("could not write %s: %v", githookPath, err), 1)
+	}
+	fmt.Printf("created %s for team sharing\n", githookPath)
+	fmt.Println()
+	fmt.Println("To share the hook with your team, commit .githooks/ and ask teammates to run:")
+	fmt.Println("  git config core.hooksPath .githooks")
 	return nil
 }
 
