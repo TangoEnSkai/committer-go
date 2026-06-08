@@ -18,6 +18,12 @@ import (
 func main() {
 	origin := initialise()
 
+	cfg, err := committer.LoadConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not load config: %v\n", err)
+		cfg = committer.DefaultConfig()
+	}
+
 	commitMsg, err := committer.Read(*origin)
 	if err != nil {
 		committer.Print(commitMsg, err.Error())
@@ -31,14 +37,14 @@ func main() {
 	}
 
 	// 1. check the commit message is shorter than maximum length
-	errMsg, ok := committer.CheckLength(header)
+	errMsg, ok := committer.CheckLengthWithConfig(header, cfg)
 	if !ok {
 		committer.Print(commitMsg, errMsg)
 		os.Exit(1)
 	}
 
 	// 2. check commit type
-	errMsg, ok = committer.CheckCommitType(header)
+	errMsg, ok = committer.CheckCommitTypeWithConfig(header, cfg)
 	if !ok {
 		committer.Print(commitMsg, errMsg)
 		os.Exit(1)

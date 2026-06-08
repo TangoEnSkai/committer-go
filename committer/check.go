@@ -3,26 +3,28 @@ package committer
 import "fmt"
 
 const (
-	maxLength = 60 // maximum length of a commit message
-	minLength = 10 // minimum length of a commit message
+	maxLength = 60 // default maximum length of a commit message
+	minLength = 10 // default minimum length of a commit message
 )
 
-// CheckLength is checking the length of commit messages
-// for the commit that has proper length, it will NOOP
-// for longer commit messages, it prints the error message and stop the program
+// CheckLength checks the length of commit messages against the provided config.
+// For the commit that has proper length, it will NOOP.
+// For longer/shorter commit messages, it returns the error message.
 func CheckLength(m Message) (errStr string, ok bool) {
-	// need to check length
+	return CheckLengthWithConfig(m, DefaultConfig())
+}
+
+// CheckLengthWithConfig checks the length using the given Config.
+func CheckLengthWithConfig(m Message, cfg Config) (errStr string, ok bool) {
 	l := len(m)
 
-	// message only commit message length is shorter than the limit
-	if l < minLength {
-		return fmt.Sprintf("\tthe commit `%s` is too short: got(%d), need >= (%d)", m, l, minLength), false
+	if l < cfg.Length.Min {
+		return fmt.Sprintf("\tthe commit `%s` is too short: got(%d), need >= (%d)", m, l, cfg.Length.Min), false
 	}
 
-	// message only commit message length is longer than the limit
-	if l > maxLength {
+	if l > cfg.Length.Max {
 		return fmt.Sprintf(
-			"\tthe commit `%s` is too long: got(%d), need <= (%d)", m, l, maxLength,
+			"\tthe commit `%s` is too long: got(%d), need <= (%d)", m, l, cfg.Length.Max,
 		), false
 	}
 
