@@ -3,6 +3,7 @@ package committer
 import (
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 // PatternMatch checks whether the given msg follows proper style or out
@@ -27,11 +28,11 @@ func PatternMatch(m Message) (errMsg string, ok bool) {
 	return "", matched
 }
 
-// getPattern return a regular expression of conventional commit message
-// The regex pattern is highly inspired by convention of Angular and the Conventional Commits
-// FYI, the types of commits in regex sorted in alphabetical order for better readability
+// getPattern returns a regular expression of conventional commit message.
+// The type alternation is built from validTypes so there is one place to
+// add or remove a type.
+// The regex pattern follows the Angular / Conventional Commits convention.
 func getPattern() string {
-	const pattern = `^(BREAKING CHANGE|build|chore|ci|deps|docs|feat|fix|perf|refactor|revert|style|test)(\([a-zA-Z0-9 _\-]+\))?!?: [\w \-.,!':/@()]+$`
-
-	return pattern
+	alternation := strings.Join(validTypes, "|")
+	return `^(` + alternation + `)(\([a-zA-Z0-9 _\-]+\))?!?: [\w \-.,!':/@()]+$`
 }
