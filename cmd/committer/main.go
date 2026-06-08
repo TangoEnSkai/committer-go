@@ -83,6 +83,26 @@ func main() {
 					return runCheck(c.Int("count"), cfg, c.String("format"))
 				},
 			},
+			{
+				Name:  "config",
+				Usage: "Manage committer-go configuration",
+				Subcommands: []*cli.Command{
+					{
+						Name:  "validate",
+						Usage: "Validate .committer.yaml in the current directory",
+						Action: func(c *cli.Context) error {
+							return runConfigValidate()
+						},
+					},
+					{
+						Name:  "schema",
+						Usage: "Print JSON Schema for .committer.yaml to stdout",
+						Action: func(c *cli.Context) error {
+							return runConfigSchema()
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -192,6 +212,88 @@ func runInit() error {
 	fmt.Println()
 	fmt.Println("To share the hook with your team, commit .githooks/ and ask teammates to run:")
 	fmt.Println("  git config core.hooksPath .githooks")
+	return nil
+}
+
+// runConfigValidate validates .committer.yaml in the current working directory.
+func runConfigValidate() error {
+	cfg, err := committer.LoadConfig()
+	if err != nil {
+		return cli.Exit(fmt.Sprintf(".committer.yaml is invalid: %v", err), 1)
+	}
+	// Basic sanity checks on the loaded config.
+	if cfg.Length.Min <= 0 {
+		return cli.Exit("config error: length.min must be > 0", 1)
+	}
+	if cfg.Length.Max <= 0 {
+		return cli.Exit("config error: length.max must be > 0", 1)
+	}
+	if cfg.Length.Min > cfg.Length.Max {
+		return cli.Exit(fmt.Sprintf("config error: length.min (%d) must be <= length.max (%d)", cfg.Length.Min, cfg.Length.Max), 1)
+	}
+	fmt.Println(".committer.yaml is valid")
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(cfg)
+	return nil
+}
+
+// committerYAMLSchema is the JSON Schema for .committer.yaml.
+const committerYAMLSchema = `{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "committer-go configuration",
+  "description": "Configuration file for committer-go commit message validator",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "length": {
+      "type": "object",
+      "description": "Controls header length validation",
+      "additionalProperties": false,
+      "properties": {
+        "min": {
+          "type": "integer",
+          "description": "Minimum header length in characters (default: 10)",
+          "minimum": 1
+        },
+        "max": {
+          "type": "integer",
+          "description": "Maximum header length in characters (default: 60)",
+          "minimum": 1
+        }
+      }
+    },
+    "types": {
+      "type": "object",
+      "description": "Extends the built-in commit type list",
+      "additionalProperties": false,
+      "properties": {
+        "extra": {
+          "type": "array",
+          "description": "Additional project-specific commit types",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "body": {
+      "type": "object",
+      "description": "Controls body/footer validation",
+      "additionalProperties": false,
+      "properties": {
+        "max_line_length": {
+          "type": "integer",
+          "description": "Maximum body line length (default: 72, 0 = disabled)",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
+`
+
+// runConfigSchema prints the JSON Schema for .committer.yaml to stdout.
+func runConfigSchema() error {
+	fmt.Print(committerYAMLSchema)
 	return nil
 }
 
