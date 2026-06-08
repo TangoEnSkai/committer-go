@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>committer-go playground</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; background: #f9f9f9; color: #222; }
+    h1 { font-size: 1.4rem; }
+    textarea { width: 100%; box-sizing: border-box; font-family: monospace; font-size: 0.95rem; padding: 10px; border: 1px solid #ccc; border-radius: 4px; resize: vertical; }
+    #result { margin-top: 16px; padding: 12px; border-radius: 4px; font-size: 0.9rem; min-height: 40px; }
+    .valid   { background: #e6f4ea; border: 1px solid #34a853; color: #1e6e33; }
+    .invalid { background: #fce8e6; border: 1px solid #ea4335; color: #a00000; }
+    .loading { color: #666; }
+    ul { margin: 6px 0 0 0; padding-left: 20px; }
+  </style>
+</head>
+<body>
+  <h1>committer-go playground</h1>
+  <p>Type a commit message to validate it against the <a href="https://www.conventionalcommits.org/">Conventional Commits</a> spec.</p>
+  <textarea id="msg" rows="4" placeholder="feat: add login page"></textarea>
+  <div id="result" class="loading">Loading WASM…</div>
+
+  <script src="wasm_exec.js"></script>
+  <script>
+    const go = new Go();
+    WebAssembly.instantiateStreaming(fetch("app.wasm"), go.importObject).then(result => {
+      go.run(result.instance);
+      document.getElementById("result").textContent = "Ready. Start typing above.";
+      document.getElementById("result").className = "";
+    });
+
+    document.getElementById("msg").addEventListener("input", function () {
+      const msg = this.value.trim();
+      const el = document.getElementById("result");
+      if (!msg) { el.textContent = ""; el.className = ""; return; }
+      if (typeof validateCommit !== "function") { el.textContent = "WASM not loaded yet."; return; }
+
+      let parsed;
+      try { parsed = JSON.parse(validateCommit(msg)); } catch (e) { el.textContent = "Parse error: " + e; return; }
+
+      if (parsed.valid) {
+        el.className = "valid";
+        el.textContent = "✓ Valid commit message";
+      } else {
+        el.className = "invalid";
+        const ul = document.createElement("ul");
+        (parsed.errors || []).forEach(err => {
+          const li = document.createElement("li");
+          li.textContent = err.message;
+          ul.appendChild(li);
+        });
+        el.innerHTML = "✗ Validation failed:";
+        el.appendChild(ul);
+      }
+    });
+  </script>
+</body>
+</html>
