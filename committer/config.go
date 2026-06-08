@@ -14,6 +14,14 @@ const configFileName = ".committer.yaml"
 type Config struct {
 	Length LengthConfig `yaml:"length"`
 	Types  TypesConfig  `yaml:"types"`
+	Body   BodyConfig   `yaml:"body"`
+}
+
+// BodyConfig controls validation of the commit message body.
+type BodyConfig struct {
+	// MaxLineLength is the maximum allowed length for body lines.
+	// Default is 72. Set to 0 to disable.
+	MaxLineLength int `yaml:"max_line_length"`
 }
 
 // LengthConfig controls the minimum and maximum commit header length.
@@ -33,6 +41,9 @@ func DefaultConfig() Config {
 		Length: LengthConfig{
 			Min: minLength,
 			Max: maxLength,
+		},
+		Body: BodyConfig{
+			MaxLineLength: 72,
 		},
 	}
 }
@@ -60,6 +71,9 @@ func LoadConfig() (Config, error) {
 	}
 	if cfg.Length.Max == 0 {
 		cfg.Length.Max = maxLength
+	}
+	if cfg.Body.MaxLineLength == 0 {
+		cfg.Body.MaxLineLength = 72
 	}
 
 	return cfg, nil
