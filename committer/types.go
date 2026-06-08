@@ -37,6 +37,12 @@ var validTypeSet = func() map[string]struct{} {
 
 // CheckCommitType checks that the type prefix of the commit message is valid.
 func CheckCommitType(m Message) (errMsg string, ok bool) {
+	return CheckCommitTypeWithConfig(m, DefaultConfig())
+}
+
+// CheckCommitTypeWithConfig checks the type using the given Config.
+// Extra types from cfg.Types.Extra are accepted in addition to the built-in list.
+func CheckCommitTypeWithConfig(m Message, cfg Config) (errMsg string, ok bool) {
 	var b strings.Builder
 
 	for i, n := 0, len(m); i < n; i++ {
@@ -50,16 +56,25 @@ func CheckCommitType(m Message) (errMsg string, ok bool) {
 		b.WriteByte(c)
 	}
 
-	if _, found := validTypeSet[b.String()]; !found {
-		errMsg = fmt.Sprintf(
-			"%v has invalid commit type\n\tavailable commit types are:\n\t%v",
-			m, printTypes(),
-		)
+	t := b.String()
 
-		return errMsg, false
+	if _, found := validTypeSet[t]; found {
+		return "", true
 	}
 
-	return "", true
+	for _, extra := range cfg.Types.Extra {
+		if extra == t {
+			return "", true
+		}
+	}
+
+	allTypes := append(validTypes, cfg.Types.Extra...)
+	errMsg = fmt.Sprintf(
+		"%v has invalid commit type\n\tavailable commit types are:\n\t(%v)",
+		m, strings.Join(allTypes, " | "),
+	)
+
+	return errMsg, false
 }
 
 // printTypes returns a formatted list of valid commit types for display in errors.
