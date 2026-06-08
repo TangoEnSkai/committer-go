@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,12 @@ const hookContent = `#!/bin/sh
 committer "$1"
 `
 
+var formatFlag = &cli.StringFlag{
+	Name:  "format",
+	Value: "text",
+	Usage: "Output format: text or json",
+}
+
 func main() {
 	cfg, err := committer.LoadConfig()
 	if err != nil {
@@ -23,30 +30,26 @@ func main() {
 	app := &cli.App{
 		Name:  "committer",
 		Usage: "Conventional Commits message validator",
+		Flags: []cli.Flag{formatFlag},
 		// Default action: hook mode — committer <path-to-commit-msg-file>
 		Action: func(c *cli.Context) error {
 			if c.NArg() < 1 {
 				return cli.Exit("unexpected error: no arguments passed to this script", 1)
 			}
-			return runHook(c.Args().First(), cfg)
+			return runHook(c.Args().First(), cfg, c.String("format"))
 		},
 		Commands: []*cli.Command{
 			{
 				Name:      "lint",
 				Usage:     "Validate a commit message string",
 				ArgsUsage: "<message>",
+				Flags:     []cli.Flag{formatFlag},
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
 						return cli.Exit("lint requires a commit message argument", 1)
 					}
 					msg := committer.Message(c.Args().First())
-					errMsg, ok := committer.ValidateMessage(msg, cfg)
-					if !ok {
-						committer.Print(msg, errMsg)
-						return cli.Exit("", 1)
-					}
-					fmt.Println("commit message is valid")
-					return nil
+					return runValidate(msg, cfg, c.String("format"))
 				},
 			},
 			{
@@ -60,25 +63,42 @@ func main() {
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		// cli.Exit errors are already printed by the framework; others are not
 		os.Exit(1)
 	}
 }
 
 // runHook is the original hook-mode logic.
-func runHook(path string, cfg committer.Config) error {
+func runHook(path string, cfg committer.Config, format string) error {
 	commitMsg, err := committer.Read(path)
 	if err != nil {
 		committer.Print(commitMsg, err.Error())
 		return cli.Exit("", 1)
 	}
+	return runValidate(commitMsg, cfg, format)
+}
 
-	errMsg, ok := committer.ValidateMessage(commitMsg, cfg)
-	if !ok {
-		committer.Print(commitMsg, errMsg)
-		return cli.Exit("", 1)
+// runValidate validates msg and prints results in the requested format.
+func runValidate(msg committer.Message, cfg committer.Config, format string) error {
+	if format == "json" {
+		result := committer.ValidateMessageStructured(msg, cfg)
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(result); err != nil {
+			return cli.Exit(fmt.Sprintf("json encode error: %v", err), 1)
+		}
+		if !result.Valid {
+			return cli.Exit("", 1)
+		}
+		return nil
 	}
 
+	// text mode (default)
+	errMsg, ok := committer.ValidateMessage(msg, cfg)
+	if !ok {
+		committer.Print(msg, errMsg)
+		return cli.Exit("", 1)
+	}
+	fmt.Println("commit message is valid")
 	return nil
 }
 
