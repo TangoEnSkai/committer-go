@@ -295,6 +295,39 @@ const committerYAMLSchema = `{
           "minimum": 0
         }
       }
+    },
+    "ai": {
+      "type": "object",
+      "description": "Controls optional Claude AI integration",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable AI-assisted commit message suggestions (default: false)"
+        },
+        "provider": {
+          "type": "string",
+          "description": "AI provider to use (default: anthropic)",
+          "enum": ["anthropic"]
+        },
+        "model": {
+          "type": "string",
+          "description": "Model ID to use (default: claude-haiku-4-5-20251001)"
+        },
+        "api_key_env": {
+          "type": "string",
+          "description": "Environment variable holding the API key (default: ANTHROPIC_API_KEY)"
+        },
+        "auto_fix_on_failure": {
+          "type": "boolean",
+          "description": "Automatically suggest a fix when validation fails (default: false)"
+        },
+        "max_diff_chars": {
+          "type": "integer",
+          "description": "Maximum characters of diff to send to the AI (default: 4000)",
+          "minimum": 0
+        }
+      }
     }
   }
 }
