@@ -1,0 +1,39 @@
+name: Deploy Playground
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'playground/**'
+      - 'committer/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build WASM
+        run: make -C playground build
+
+      - name: Copy wasm_exec.js
+        run: |
+          GOROOT=$(go env GOROOT)
+          cp "$GOROOT/misc/wasm/wasm_exec.js" playground/wasm_exec.js
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: playground/static/
+          publish_branch: gh-pages
+          force_orphan: true
