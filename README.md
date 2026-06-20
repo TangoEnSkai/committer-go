@@ -117,6 +117,18 @@ repos:
       - id: committer-go
 ```
 
+
+## GitHub Actions
+
+Add commit message validation to your CI pipeline:
+
+```yaml
+- uses: TangoEnSkai/committer-go@master
+  with:
+    validate: commits   # or: pr-title
+    count: 10
+```
+
 ---
 
 ## Development
