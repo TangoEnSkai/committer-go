@@ -112,3 +112,10 @@ func findTypeSuggestion(input string, types []string) string {
 func printTypes() string {
 	return "(" + strings.Join(validTypes, " | ") + ")"
 }
+
+// ValidTypesList returns a copy of the built-in valid commit types.
+func ValidTypesList() []string {
+	result := make([]string, len(validTypes))
+	copy(result, validTypes)
+	return result
+}

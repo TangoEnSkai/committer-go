@@ -10,7 +10,7 @@ func NewFromConfig(enabled bool, provider, model, apiKeyEnv string) (AIProvider,
 	}
 	switch provider {
 	case "anthropic":
-		return nil, fmt.Errorf("%w: anthropic provider not yet wired — set %s and install the anthropic-sdk-go", ErrProviderUnavailable, apiKeyEnv)
+		return NewAnthropicProvider(apiKeyEnv, model)
 	default:
 		return nil, fmt.Errorf("%w: unknown provider %q", ErrProviderUnavailable, provider)
 	}
