@@ -34,6 +34,9 @@ jobs:
       - name: Test
         run: go test -v -race -coverprofile=coverage.out ./...
 
+      - name: Fuzz test (short run)
+        run: go test ./committer/... -run=^$ -fuzz=FuzzValidateMessage -fuzztime=10s
+
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
