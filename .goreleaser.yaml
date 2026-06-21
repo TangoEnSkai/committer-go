@@ -49,3 +49,23 @@ changelog:
       - "^test:"
       - "^chore:"
       - "Merge pull request"
+
+brews:
+  - name: committer-go
+    repository:
+      owner: TangoEnSkai
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: "https://github.com/TangoEnSkai/committer-go"
+    description: "Conventional Commits message validator with AI support"
+    license: "MIT"
+    skip_upload: auto
+    install: |
+      bin.install "committer"
+    test: |
+      system "#{bin}/committer", "lint", "feat: test brew install"
