@@ -204,3 +204,112 @@ func TestCheckCommitTypeWithConfig_ExtraTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadConfig_AIBlock_Present(t *testing.T) {
+	tmp := t.TempDir()
+	content := []byte(`ai:
+  enabled: true
+  provider: anthropic
+  model: claude-haiku-4-5-20251001
+  api_key_env: MY_API_KEY
+  auto_fix_on_failure: true
+  max_diff_chars: 8000
+`)
+	if err := os.WriteFile(filepath.Join(tmp, ".committer.yaml"), content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	orig, _ := os.Getwd()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(orig) }()
+
+	cfg, err := committer.LoadConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !cfg.AI.Enabled {
+		t.Error("AI.Enabled: got false, want true")
+	}
+	if cfg.AI.Provider != "anthropic" {
+		t.Errorf("AI.Provider: got %q, want %q", cfg.AI.Provider, "anthropic")
+	}
+	if cfg.AI.Model != "claude-haiku-4-5-20251001" {
+		t.Errorf("AI.Model: got %q, want %q", cfg.AI.Model, "claude-haiku-4-5-20251001")
+	}
+	if cfg.AI.APIKeyEnv != "MY_API_KEY" {
+		t.Errorf("AI.APIKeyEnv: got %q, want %q", cfg.AI.APIKeyEnv, "MY_API_KEY")
+	}
+	if !cfg.AI.AutoFixOnFailure {
+		t.Error("AI.AutoFixOnFailure: got false, want true")
+	}
+	if cfg.AI.MaxDiffChars != 8000 {
+		t.Errorf("AI.MaxDiffChars: got %d, want 8000", cfg.AI.MaxDiffChars)
+	}
+}
+
+func TestLoadConfig_AIBlock_Absent(t *testing.T) {
+	tmp := t.TempDir()
+	// Write a config with no ai block
+	content := []byte("length:\n  max: 80\n")
+	if err := os.WriteFile(filepath.Join(tmp, ".committer.yaml"), content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	orig, _ := os.Getwd()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(orig) }()
+
+	cfg, err := committer.LoadConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	def := committer.DefaultConfig()
+	if cfg.AI.Enabled != def.AI.Enabled {
+		t.Errorf("AI.Enabled: got %v, want %v", cfg.AI.Enabled, def.AI.Enabled)
+	}
+	if cfg.AI.Provider != def.AI.Provider {
+		t.Errorf("AI.Provider: got %q, want %q", cfg.AI.Provider, def.AI.Provider)
+	}
+	if cfg.AI.Model != def.AI.Model {
+		t.Errorf("AI.Model: got %q, want %q", cfg.AI.Model, def.AI.Model)
+	}
+	if cfg.AI.MaxDiffChars != def.AI.MaxDiffChars {
+		t.Errorf("AI.MaxDiffChars: got %d, want %d", cfg.AI.MaxDiffChars, def.AI.MaxDiffChars)
+	}
+}
+
+func TestLoadConfig_AIBlock_Partial(t *testing.T) {
+	tmp := t.TempDir()
+	// Only set model, everything else should retain defaults
+	content := []byte("ai:\n  enabled: true\n  model: claude-opus-4-5\n")
+	if err := os.WriteFile(filepath.Join(tmp, ".committer.yaml"), content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	orig, _ := os.Getwd()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(orig) }()
+
+	cfg, err := committer.LoadConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !cfg.AI.Enabled {
+		t.Error("AI.Enabled: got false, want true")
+	}
+	if cfg.AI.Model != "claude-opus-4-5" {
+		t.Errorf("AI.Model: got %q, want %q", cfg.AI.Model, "claude-opus-4-5")
+	}
+	// Provider and APIKeyEnv should be zero-value from YAML since not set in file
+	// (LoadConfig doesn't apply defaults to non-zero-only fields for AI yet,
+	// but the YAML-unmarshalled local will have empty strings for unset fields).
+}

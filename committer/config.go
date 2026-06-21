@@ -14,6 +14,16 @@ import (
 
 const configFileName = ".committer.yaml"
 
+// AIConfig controls optional Claude AI integration.
+type AIConfig struct {
+	Enabled          bool   `yaml:"enabled"`
+	Provider         string `yaml:"provider"`
+	Model            string `yaml:"model"`
+	APIKeyEnv        string `yaml:"api_key_env"`
+	AutoFixOnFailure bool   `yaml:"auto_fix_on_failure"`
+	MaxDiffChars     int    `yaml:"max_diff_chars"`
+}
+
 // Config holds the optional per-project configuration for committer-go.
 // All fields have sensible defaults; a missing config file is not an error.
 type Config struct {
@@ -21,6 +31,7 @@ type Config struct {
 	Length  LengthConfig `yaml:"length"`
 	Types   TypesConfig  `yaml:"types"`
 	Body    BodyConfig   `yaml:"body"`
+	AI      AIConfig     `yaml:"ai"`
 }
 
 // BodyConfig controls validation of the commit message body.
@@ -50,6 +61,13 @@ func DefaultConfig() Config {
 		},
 		Body: BodyConfig{
 			MaxLineLength: 72,
+		},
+		AI: AIConfig{
+			Enabled:      false,
+			Provider:     "anthropic",
+			Model:        "claude-haiku-4-5-20251001",
+			APIKeyEnv:    "ANTHROPIC_API_KEY",
+			MaxDiffChars: 4000,
 		},
 	}
 }
@@ -89,6 +107,20 @@ func LoadConfig() (Config, error) {
 	}
 	if local.Body.MaxLineLength == 0 {
 		local.Body.MaxLineLength = 72
+	}
+
+	// Apply AI defaults for unset fields.
+	if local.AI.Provider == "" {
+		local.AI.Provider = "anthropic"
+	}
+	if local.AI.Model == "" {
+		local.AI.Model = "claude-haiku-4-5-20251001"
+	}
+	if local.AI.APIKeyEnv == "" {
+		local.AI.APIKeyEnv = "ANTHROPIC_API_KEY"
+	}
+	if local.AI.MaxDiffChars == 0 {
+		local.AI.MaxDiffChars = 4000
 	}
 
 	return local, nil
@@ -144,5 +176,25 @@ func mergeConfigs(base, local Config) Config {
 	}
 	// Extra types are additive.
 	result.Types.Extra = append(base.Types.Extra, local.Types.Extra...)
+
+	// AI config: non-zero values from local override base.
+	if local.AI.Enabled {
+		result.AI.Enabled = local.AI.Enabled
+	}
+	if local.AI.Provider != "" {
+		result.AI.Provider = local.AI.Provider
+	}
+	if local.AI.Model != "" {
+		result.AI.Model = local.AI.Model
+	}
+	if local.AI.APIKeyEnv != "" {
+		result.AI.APIKeyEnv = local.AI.APIKeyEnv
+	}
+	if local.AI.AutoFixOnFailure {
+		result.AI.AutoFixOnFailure = local.AI.AutoFixOnFailure
+	}
+	if local.AI.MaxDiffChars != 0 {
+		result.AI.MaxDiffChars = local.AI.MaxDiffChars
+	}
 	return result
 }
