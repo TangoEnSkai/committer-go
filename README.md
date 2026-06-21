@@ -143,6 +143,12 @@ make commit-checker
 
 ---
 
+## Online Playground
+
+Try committer-go in your browser: **[committer-go playground](https://tangoenskai.github.io/committer-go/)**
+
+---
+
 ## Playground (WASM)
 
 A browser-based playground lets you validate commit messages without installing anything.
