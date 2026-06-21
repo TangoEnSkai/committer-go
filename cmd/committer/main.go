@@ -108,6 +108,42 @@ func main() {
 					},
 				},
 			},
+			{
+				Name:  "changelog",
+				Usage: "Generate a CHANGELOG from conventional commit history",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "from",
+						Usage: "Start ref (tag or commit hash); defaults to last git tag",
+					},
+					&cli.StringFlag{
+						Name:  "to",
+						Value: "HEAD",
+						Usage: "End ref (tag or commit hash)",
+					},
+					&cli.StringFlag{
+						Name:  "output",
+						Usage: "Write output to file instead of stdout",
+					},
+					&cli.StringFlag{
+						Name:  "version",
+						Usage: "Version label for the changelog section header",
+					},
+					&cli.BoolFlag{
+						Name:  "strict",
+						Usage: "Fail if any commit in range is not a valid Conventional Commit",
+					},
+				},
+				Action: func(c *cli.Context) error {
+					return runChangelog(
+						c.String("from"),
+						c.String("to"),
+						c.String("output"),
+						c.String("version"),
+						c.Bool("strict"),
+					)
+				},
+			},
 		},
 	}
 
@@ -410,6 +446,38 @@ func runCheck(count int, cfg committer.Config, format string) error {
 		}
 		return cli.Exit("", 1)
 	}
+	return nil
+}
+
+
+// runChangelog generates a CHANGELOG from conventional commit history.
+func runChangelog(from, to, output, version string, strict bool) error {
+	entries, skipped, err := committer.GitLog(from, to, strict)
+	if err != nil {
+		return cli.Exit(fmt.Sprintf("changelog: %v", err), 1)
+	}
+
+	if len(skipped) > 0 {
+		fmt.Fprintf(os.Stderr, "warning: skipped %d non-conventional commits\n", len(skipped))
+	}
+
+	if len(entries) == 0 {
+		fmt.Fprintln(os.Stderr, "no conventional commits found in range")
+		return nil
+	}
+
+	sections := committer.BuildChangelog(entries, true)
+	md := committer.FormatChangelog(sections, version)
+
+	if output != "" {
+		if err := os.WriteFile(output, []byte(md), 0o644); err != nil {
+			return cli.Exit(fmt.Sprintf("could not write %s: %v", output, err), 1)
+		}
+		fmt.Printf("wrote changelog to %s\n", output)
+		return nil
+	}
+
+	fmt.Print(md)
 	return nil
 }
 
