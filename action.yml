@@ -1,0 +1,70 @@
+name: 'committer-go'
+description: 'Validate commit messages against Conventional Commits spec'
+author: 'TangoEnSkai'
+
+inputs:
+  validate:
+    description: 'What to validate: "commits" (push/PR commits) or "pr-title"'
+    required: false
+    default: 'commits'
+  count:
+    description: 'Number of recent commits to validate (for "commits" mode)'
+    required: false
+    default: '10'
+  version:
+    description: 'committer-go version to use (default: latest)'
+    required: false
+    default: 'latest'
+
+outputs:
+  result:
+    description: 'Validation result: "passed" or "failed"'
+    value: ${{ steps.validate.outputs.result }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install committer-go
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64) ARCH="amd64" ;;
+          aarch64|arm64) ARCH="arm64" ;;
+        esac
+
+        if [ "$VERSION" = "latest" ]; then
+          VERSION=$(curl -s https://api.github.com/repos/TangoEnSkai/committer-go/releases/latest | grep '"tag_name"' | sed 's/.*"tag_name": *"\(.*\)".*/\1/')
+        fi
+
+        BINARY_NAME="committer-go_${OS}_${ARCH}.tar.gz"
+        URL="https://github.com/TangoEnSkai/committer-go/releases/download/${VERSION}/${BINARY_NAME}"
+
+        curl -sSL "$URL" -o committer.tar.gz
+        tar -xzf committer.tar.gz
+        chmod +x committer
+        sudo mv committer /usr/local/bin/committer
+        committer --version || echo "committer installed"
+
+    - name: Validate commits
+      id: validate
+      shell: bash
+      run: |
+        if [ "${{ inputs.validate }}" = "pr-title" ]; then
+          TITLE="${{ github.event.pull_request.title }}"
+          if committer lint "$TITLE"; then
+            echo "result=passed" >> $GITHUB_OUTPUT
+          else
+            echo "result=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+        else
+          if committer check --count ${{ inputs.count }}; then
+            echo "result=passed" >> $GITHUB_OUTPUT
+          else
+            echo "result=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+        fi
