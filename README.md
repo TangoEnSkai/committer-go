@@ -66,6 +66,12 @@ feat: too short               # under 10 chars
 
 ## Installation
 
+### macOS (Homebrew)
+
+```bash
+brew install TangoEnSkai/tap/committer-go
+```
+
 ### via `go install`
 
 ```bash
