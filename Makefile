@@ -29,3 +29,7 @@ help:
 	@printf "\ttest:\t\trun all tests with race detection and coverage\n"
 	@printf "\tvet:\t\trun go vet\n"
 	@printf "\tbuild:\t\tverify build compiles\n"
+
+.PHONY: bench
+bench:
+	go test ./... -bench=. -benchmem -count=3 | tee bench.txt
