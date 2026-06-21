@@ -180,6 +180,10 @@ python3 -m http.server 8080
 
 ---
 
+## VS Code Extension
+
+Install the [committer-go VS Code Extension](https://github.com/TangoEnSkai/committer-go-vscode) for inline real-time validation in the Source Control commit input box.
+
 ## License
 
 [MIT](./LICENSE)
