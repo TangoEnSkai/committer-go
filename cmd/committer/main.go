@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/TangoEnSkai/committer-go/committer"
+	"github.com/TangoEnSkai/committer-go/committer/ai"
 	"github.com/urfave/cli/v2"
 )
 
@@ -142,6 +144,39 @@ func main() {
 						c.String("version"),
 						c.Bool("strict"),
 					)
+				},
+			},
+			{
+				Name:  "ai",
+				Usage: "AI-powered commit message tools (requires ANTHROPIC_API_KEY)",
+				Subcommands: []*cli.Command{
+					{
+						Name:      "suggest",
+						Usage:     "Generate a commit message from staged changes",
+						ArgsUsage: "",
+						Flags: []cli.Flag{
+							&cli.BoolFlag{Name: "yes", Aliases: []string{"y"}, Usage: "Accept suggestion without prompting"},
+							&cli.StringFlag{Name: "diff", Usage: "Read diff from file instead of git diff --staged"},
+							&cli.BoolFlag{Name: "json", Usage: "Output raw JSON suggestion"},
+						},
+						Action: func(c *cli.Context) error {
+							return runAISuggest(c, cfg)
+						},
+					},
+					{
+						Name:      "fix",
+						Usage:     "Fix a commit message that failed validation",
+						ArgsUsage: "<message>",
+						Flags: []cli.Flag{
+							&cli.BoolFlag{Name: "yes", Aliases: []string{"y"}, Usage: "Accept fix without prompting"},
+						},
+						Action: func(c *cli.Context) error {
+							if c.NArg() < 1 {
+								return cli.Exit("fix requires a commit message argument", 1)
+							}
+							return runAIFix(c.Args().First(), c.Bool("yes"), cfg)
+						},
+					},
 				},
 			},
 		},
@@ -500,4 +535,126 @@ func findGitDir(dir string) (string, error) {
 		}
 		abs = parent
 	}
+}
+
+func runAISuggest(c *cli.Context, cfg committer.Config) error {
+	ctx := context.Background()
+
+	// Get diff
+	var diffText string
+	if diffFile := c.String("diff"); diffFile != "" {
+		data, err := os.ReadFile(diffFile)
+		if err != nil {
+			return cli.Exit(fmt.Sprintf("could not read diff file: %v", err), 1)
+		}
+		diffText = string(data)
+	} else {
+		out, err := exec.Command("git", "diff", "--staged").Output()
+		if err != nil {
+			return cli.Exit(fmt.Sprintf("git diff --staged failed: %v", err), 1)
+		}
+		diffText = string(out)
+	}
+
+	if strings.TrimSpace(diffText) == "" {
+		return cli.Exit("no staged changes found — run 'git add' first", 1)
+	}
+
+	provider, err := ai.NewFromConfig(cfg.AI.Enabled, cfg.AI.Provider, cfg.AI.Model, cfg.AI.APIKeyEnv)
+	if err != nil {
+		return cli.Exit(fmt.Sprintf("AI provider unavailable: %v\n\nEnable AI in .committer.yaml:\n  ai:\n    enabled: true\n    api_key_env: ANTHROPIC_API_KEY", err), 1)
+	}
+
+	allTypes := append(committer.ValidTypesList(), cfg.Types.Extra...)
+	suggestCfg := ai.SuggestConfig{
+		AllowedTypes: allTypes,
+		MaxHeaderLen: cfg.Length.Max,
+		MaxDiffChars: cfg.AI.MaxDiffChars,
+		Model:        cfg.AI.Model,
+	}
+
+	fmt.Fprintln(os.Stderr, "Generating commit message...")
+	suggestion, err := provider.SuggestFromDiff(ctx, diffText, suggestCfg)
+	if err != nil {
+		return cli.Exit(fmt.Sprintf("AI suggestion failed: %v", err), 1)
+	}
+
+	if c.Bool("json") {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetEscapeHTML(false)
+		return enc.Encode(suggestion)
+	}
+
+	header := suggestion.Header()
+
+	fmt.Printf("\n✔ Suggested commit message:\n  %s\n", header)
+	if suggestion.Body != "" {
+		fmt.Printf("\n  %s\n", suggestion.Body)
+	}
+
+	if !c.Bool("yes") {
+		fmt.Print("\nAccept? [Y/n] ")
+		var answer string
+		fmt.Scanln(&answer)
+		if answer != "" && strings.ToLower(answer) != "y" {
+			fmt.Fprintln(os.Stderr, "Suggestion rejected.")
+			return nil
+		}
+	}
+
+	full := header
+	if suggestion.Body != "" {
+		full += "\n\n" + suggestion.Body
+	}
+	fmt.Println(full)
+	return nil
+}
+
+func runAIFix(msg string, autoAccept bool, cfg committer.Config) error {
+	ctx := context.Background()
+
+	// Run validation to get violations
+	errMsg, ok := committer.ValidateMessage(committer.Message(msg), cfg)
+	if ok {
+		fmt.Println("commit message is already valid — no fix needed")
+		return nil
+	}
+
+	provider, err := ai.NewFromConfig(cfg.AI.Enabled, cfg.AI.Provider, cfg.AI.Model, cfg.AI.APIKeyEnv)
+	if err != nil {
+		return cli.Exit(fmt.Sprintf("AI provider unavailable: %v", err), 1)
+	}
+
+	allTypes := append(committer.ValidTypesList(), cfg.Types.Extra...)
+	suggestCfg := ai.SuggestConfig{
+		AllowedTypes: allTypes,
+		MaxHeaderLen: cfg.Length.Max,
+		MaxDiffChars: cfg.AI.MaxDiffChars,
+		Model:        cfg.AI.Model,
+	}
+
+	fmt.Fprintf(os.Stderr, "\n✗ Validation failed:\n  %s\n\nGenerating fix...\n", errMsg)
+	suggestion, err := provider.FixMessage(ctx, msg, []string{errMsg}, suggestCfg)
+	if err != nil {
+		return cli.Exit(fmt.Sprintf("AI fix failed: %v", err), 1)
+	}
+
+	header := suggestion.Header()
+	fmt.Printf("\n✔ AI suggestion:\n  %s\n", header)
+
+	if !autoAccept {
+		fmt.Print("\nApply? [Y/n] ")
+		var answer string
+		fmt.Scanln(&answer)
+		if answer != "" && strings.ToLower(answer) != "y" {
+			return nil
+		}
+	}
+
+	full := header
+	if suggestion.Body != "" {
+		full += "\n\n" + suggestion.Body
+	}
+	fmt.Println(full)
+	return nil
 }
