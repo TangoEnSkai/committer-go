@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>committer-go playground</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; background: #f9f9f9; color: #222; }
+    h1 { font-size: 1.4rem; }
+    textarea { width: 100%; box-sizing: border-box; font-family: monospace; font-size: 0.95rem; padding: 10px; border: 1px solid #ccc; border-radius: 4px; resize: vertical; }
+    #result { margin-top: 16px; padding: 12px; border-radius: 4px; font-size: 0.9rem; min-height: 40px; }
+    .valid   { background: #e6f4ea; border: 1px solid #34a853; color: #1e6e33; }
+    .invalid { background: #fce8e6; border: 1px solid #ea4335; color: #a00000; }
+    .loading { color: #666; }
+    ul { margin: 6px 0 0 0; padding-left: 20px; }
+
+    details { margin-top: 20px; border: 1px solid #ddd; border-radius: 4px; padding: 10px 14px; background: #fff; }
+    summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; color: #444; user-select: none; }
+    .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .config-field label { display: block; font-size: 0.82rem; color: #555; margin-bottom: 3px; }
+    .config-field input { width: 100%; box-sizing: border-box; padding: 5px 8px; border: 1px solid #ccc; border-radius: 3px; font-size: 0.9rem; }
+    .config-field.full-width { grid-column: span 2; }
+    .config-note { margin-top: 10px; font-size: 0.8rem; color: #888; }
+
+    .share-row { margin-top: 12px; display: flex; align-items: center; gap: 8px; }
+    .share-row input { flex: 1; font-size: 0.82rem; padding: 5px 8px; border: 1px solid #ccc; border-radius: 3px; background: #f0f0f0; color: #444; }
+    .share-row button { padding: 5px 12px; font-size: 0.82rem; border: 1px solid #aaa; border-radius: 3px; background: #fff; cursor: pointer; }
+    .share-row button:active { background: #e8e8e8; }
+  </style>
+</head>
+<body>
+  <h1>committer-go playground</h1>
+  <p>Type a commit message to validate it against the <a href="https://www.conventionalcommits.org/">Conventional Commits</a> spec.</p>
+  <textarea id="msg" rows="4" placeholder="feat: add login page"></textarea>
+  <div id="result" class="loading">Loading WASM…</div>
+
+  <details id="config-panel">
+    <summary>Configuration</summary>
+    <div class="config-grid">
+      <div class="config-field">
+        <label for="cfg-min">Min header length</label>
+        <input type="number" id="cfg-min" value="10" min="1" max="100" />
+      </div>
+      <div class="config-field">
+        <label for="cfg-max">Max header length</label>
+        <input type="number" id="cfg-max" value="60" min="10" max="300" />
+      </div>
+      <div class="config-field full-width">
+        <label for="cfg-types">Extra commit types (comma-separated)</label>
+        <input type="text" id="cfg-types" placeholder="e.g. wip, release" />
+      </div>
+    </div>
+    <p class="config-note">Note: min/max length and extra types are informational in this playground — the WASM binary uses the built-in defaults. These fields preview what configuration would be applied in a CI environment.</p>
+  </details>
+
+  <div class="share-row">
+    <input type="text" id="share-url" readonly placeholder="Share URL will appear here…" />
+    <button id="copy-btn" onclick="copyShareUrl()">Copy link</button>
+  </div>
+
+  <script src="wasm_exec.js"></script>
+  <script>
+    const go = new Go();
+    WebAssembly.instantiateStreaming(fetch("app.wasm"), go.importObject).then(result => {
+      go.run(result.instance);
+      const el = document.getElementById("result");
+      el.textContent = "Ready. Start typing above.";
+      el.className = "";
+
+      // Restore message from URL hash on load
+      const hash = decodeURIComponent(location.hash.slice(1));
+      if (hash) {
+        document.getElementById("msg").value = hash;
+        validate(hash);
+      }
+    });
+
+    function validate(msg) {
+      const el = document.getElementById("result");
+      if (!msg) { el.textContent = ""; el.className = ""; updateShareUrl(""); return; }
+      if (typeof validateCommit !== "function") { el.textContent = "WASM not loaded yet."; return; }
+
+      let parsed;
+      try { parsed = JSON.parse(validateCommit(msg)); } catch (e) { el.textContent = "Parse error: " + e; return; }
+
+      if (parsed.valid) {
+        el.className = "valid";
+        el.textContent = "✓ Valid commit message";
+      } else {
+        el.className = "invalid";
+        const ul = document.createElement("ul");
+        (parsed.errors || []).forEach(err => {
+          const li = document.createElement("li");
+          li.textContent = err.message;
+          ul.appendChild(li);
+        });
+        el.innerHTML = "✗ Validation failed:";
+        el.appendChild(ul);
+      }
+
+      updateShareUrl(msg);
+    }
+
+    function updateShareUrl(msg) {
+      const shareInput = document.getElementById("share-url");
+      if (msg) {
+        const url = location.origin + location.pathname + "#" + encodeURIComponent(msg);
+        shareInput.value = url;
+        history.replaceState(null, "", "#" + encodeURIComponent(msg));
+      } else {
+        shareInput.value = "";
+        history.replaceState(null, "", location.pathname);
+      }
+    }
+
+    function copyShareUrl() {
+      const shareInput = document.getElementById("share-url");
+      if (!shareInput.value) return;
+      navigator.clipboard.writeText(shareInput.value).then(() => {
+        const btn = document.getElementById("copy-btn");
+        btn.textContent = "Copied!";
+        setTimeout(() => { btn.textContent = "Copy link"; }, 2000);
+      });
+    }
+
+    document.getElementById("msg").addEventListener("input", function () {
+      validate(this.value.trim());
+    });
+  </script>
+</body>
+</html>
